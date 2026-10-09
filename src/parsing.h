@@ -68,7 +68,6 @@ static Tests *parse_test_file(FILE *fp) {
 
         int count = parse_line(line, &tests->arrays[i].data);
         if (count < 0) {
-            perror("malloc");
             free_arrays(n, tests->arrays);
             free(tests);
             return NULL;
@@ -103,15 +102,36 @@ static int parse_line(const char *line, int **arr) {
         return 0;
 
     *arr = malloc(count * sizeof(int));
-    if (!*arr)
+    if (!*arr) {
+        perror("malloc");
         return -1;
+    }
 
     const char *p = line;
     for (size_t i = 0; i < count; i++) {
         while (*p && isspace((unsigned char)*p))
             p++;
-        (*arr)[i] = (int)strtol(p, (char **)&p, 10);
+
+        char *end;
+        long val = strtol(p, &end, 10);
+
+        if (end == p || (*end && !isspace((unsigned char)*end))) {
+            fprintf(stderr, "Invalid number starting at: '%.20s'\n", p);
+            free(*arr);
+            *arr = NULL;
+            return -1;
+        }
+        if (errno == ERANGE) {
+            fprintf(stderr, "Number out of range: '%.20s'\n", p);
+            free(*arr);
+            *arr = NULL;
+            return -1;
+        }
+
+        (*arr)[i] = (int)val;
+        p = end;
     }
+
     return (int)count;
 }
 
